@@ -901,6 +901,108 @@ exports.Class = class Class extends Base
     klass = new Assign @variable, klass if @variable
     klass.compile o
 
+
+#### Package
+
+exports.Package = class Package extends Base
+  constructor: (@variable, @body = new Block) ->
+    @body.packageBody = yes
+    
+  children: ['variable', 'body']
+
+  determineName: ->
+    return null unless @variable
+    decl = if tail = last @variable.properties
+      tail instanceof Access and tail.name.value
+    else
+      @variable.base.value
+    decl and= IDENTIFIER.test(decl) and decl
+
+  setContext: (name) ->
+    @body.traverseChildren false, (node) ->
+      return false if node.classBody or node.packageBody
+      
+      if node instanceof Package or node instanceof Class
+        if v = node.variable
+          ps = []
+          ps.push new Access new Literal v.base.value
+          ps.push p for p in v.properties
+          node.variable = new Value new Literal(name), ps
+
+      else if node instanceof Literal and node.value is 'this'
+        node.value    = name
+
+      else if node instanceof Code
+        node.klass    = name
+        node.context  = name if node.bound
+
+  addProperties: (node, name, o) ->
+    props = node.base.properties.slice 0
+    exprs = while assign = props.shift()
+      if assign instanceof Assign
+        base = assign.variable.base
+        delete assign.context
+        func = assign.value
+        unless assign.variable.this
+          assign.variable = new Value(new Literal(name), [new Access(base)])
+        if func instanceof Code and func.bound
+          @boundFuncs.push base
+          func.bound = no
+      assign
+    compact exprs
+
+  walkBody: (name, o) ->
+    @traverseChildren false, (child) =>
+      return false if child instanceof Package or child instanceof Class
+      if child instanceof Block
+        for node, i in exps = child.expressions
+          if node instanceof Value and node.isObject(true)
+            exps[i] = @addProperties node, name, o
+        child.expressions = exps = flatten exps
+
+  compileNode: (o) ->
+    name = @determineName() or '_Package'
+    nameLiteral = new Literal name
+    nameValue   = new Value nameLiteral
+    
+#    @body.expressions.push lName
+
+    @setContext name
+    @walkBody name, o
+
+    @body.push nameLiteral
+
+    scopeParameters = []
+    scopeArguments = []
+    pre = []
+    if @variable
+      seed = @variable.base
+    
+      for access in @variable.properties
+        seed = new Value seed, [access]
+        scopeParameters.push new Value access.name
+        scopeArguments.push seed
+
+        line = new Assign seed, new Op('||', seed, new Obj)
+        pre.push line
+    else
+      scopeParameters.push nameValue
+      scopeArguments.push new Obj
+    
+    pre = Block.wrap pre
+
+    pkg = new Code scopeParameters, @body
+    pkg = new Parens pkg
+    pkg = new Call pkg, scopeArguments
+
+    pkg.makeReturn()
+
+    if pre.expressions.length
+      pre.push pkg
+      pkg = pre
+
+    pkg.compile o
+
 #### Assign
 
 # The **Assign** is used to assign a local variable to value, or to set the
