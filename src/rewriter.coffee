@@ -138,7 +138,7 @@ class exports.Rewriter
       @tokens.splice idx, 0, ['CALL_END', ')', token[2]]
     @scanTokens (token, i, tokens) ->
       tag     = token[0]
-      noCall  = yes if tag in ['CLASS', 'IF']
+      noCall  = yes if tag in ['CLASS', 'PACKAGE', 'IF']
       [prev, current, next] = tokens[i - 1 .. i + 1]
       callObject  = not noCall and tag is 'INDENT' and
                     next and next.generated and next[0] is '{' and
@@ -161,7 +161,7 @@ class exports.Rewriter
         not token.generated and @tag(i - 1) isnt ',' and (tag in IMPLICIT_END or
         (tag is 'INDENT' and not seenControl)) and
         (tag isnt 'INDENT' or
-         (@tag(i - 2) isnt 'CLASS' and @tag(i - 1) not in IMPLICIT_BLOCK and
+         (@tag(i - 2) isnt 'CLASS' and @tag(i - 2) isnt 'PACKAGE' and @tag(i - 1) not in IMPLICIT_BLOCK and
           not ((post = @tokens[i + 1]) and post.generated and post[0] is '{')))
       , action
       prev[0] = 'FUNC_EXIST' if prev[0] is '?'
@@ -311,7 +311,7 @@ IMPLICIT_FUNC    = ['IDENTIFIER', 'SUPER', ')', 'CALL_END', ']', 'INDEX_END', '@
 
 # If preceded by an `IMPLICIT_FUNC`, indicates a function invocation.
 IMPLICIT_CALL    = [
-  'IDENTIFIER', 'NUMBER', 'STRING', 'JS', 'REGEX', 'NEW', 'PARAM_START', 'CLASS'
+  'IDENTIFIER', 'NUMBER', 'STRING', 'JS', 'REGEX', 'NEW', 'PARAM_START', 'CLASS', 'PACKAGE'
   'IF', 'TRY', 'SWITCH', 'THIS', 'BOOL', 'UNARY', 'SUPER'
   '@', '->', '=>', '[', '(', '{', '--', '++'
 ]

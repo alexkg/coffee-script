@@ -98,6 +98,7 @@ grammar =
     o 'For'
     o 'Switch'
     o 'Class'
+    o 'Package'
   ]
 
   # An indented block of expressions. Note that the [Rewriter](rewriter.html)
@@ -286,6 +287,11 @@ grammar =
     o 'CLASS SimpleAssignable Block',               -> new Class $2, null, $3
     o 'CLASS SimpleAssignable EXTENDS Value',       -> new Class $2, $4
     o 'CLASS SimpleAssignable EXTENDS Value Block', -> new Class $2, $4, $5
+  ]
+
+  Package: [
+    o 'PACKAGE Block',                                -> new Package null, $2
+    o 'PACKAGE SimpleAssignable Block',               -> new Package $2, $3
   ]
 
   # Ordinary function invocation, or a chained series of calls.
