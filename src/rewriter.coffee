@@ -150,7 +150,7 @@ class exports.Rewriter
       return 1 if token.fromThen
       return 1 unless callObject or
         prev?.spaced and (prev.call or prev[0] in IMPLICIT_FUNC) and
-        (tag in IMPLICIT_CALL or not (token.spaced or token.newLine) and tag in IMPLICIT_UNSPACED_CALL) or prev?[0] in EXPLICIT_CALL
+        (tag in IMPLICIT_CALL or not (token.spaced or token.newLine) and tag in IMPLICIT_UNSPACED_CALL) or prev?[0] in EXPLICIT_CALL and (tag in IMPLICIT_CALL or tag is 'INDENT')
       tokens.splice i, 0, ['CALL_START', '(', token[2]]
       @detectEnd i + 1, (token, i) ->
         [tag] = token
@@ -209,7 +209,7 @@ class exports.Rewriter
       return 1 unless token[0] is 'IF'
       original = token
       @detectEnd i + 1, condition, (token, i) ->
-        original[0] = 'POST_' + original[0] if token[0] isnt 'INDENT'
+        original[0] = 'POST_' + original[0] if @tokens[i-1][0] in EXPLICIT_CALL or token[0] isnt 'INDENT'
       1
 
   # Ensure that all listed pairs of tokens are correctly balanced throughout
