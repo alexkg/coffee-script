@@ -164,8 +164,8 @@ class exports.Rewriter
          (@tag(i - 2) isnt 'CLASS' and @tag(i - 1) not in IMPLICIT_BLOCK and
           not ((post = @tokens[i + 1]) and post.generated and post[0] is '{')))
       , action
-      prev[0] = 'FUNC_EXIST' if prev[0] is '?'
-      tokens[i - 2][0] = 'FUNC_EXIST' if tokens[i - 2]?[0] is '?' and prev[0] in EXPLICIT_CALL
+      exist = tokens[i - if prev[0] in EXPLICIT_CALL then 2 else 1]
+      exist[0] = 'FUNC_EXIST' if exist?[0] is '?'
       2
 
   # Because our grammar is LALR(1), it can't handle some single-line
