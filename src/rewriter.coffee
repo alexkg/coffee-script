@@ -150,7 +150,7 @@ class exports.Rewriter
       return 1 if token.fromThen
       return 1 unless callObject or
         prev?.spaced and (prev.call or prev[0] in IMPLICIT_FUNC) and
-        (tag in IMPLICIT_CALL or not (token.spaced or token.newLine) and tag in IMPLICIT_UNSPACED_CALL) or prev and prev[0] in EXPLICIT_CALL
+        (tag in IMPLICIT_CALL or not (token.spaced or token.newLine) and tag in IMPLICIT_UNSPACED_CALL) or prev?[0] in EXPLICIT_CALL
       tokens.splice i, 0, ['CALL_START', '(', token[2]]
       @detectEnd i + 1, (token, i) ->
         [tag] = token
@@ -165,6 +165,7 @@ class exports.Rewriter
           not ((post = @tokens[i + 1]) and post.generated and post[0] is '{')))
       , action
       prev[0] = 'FUNC_EXIST' if prev[0] is '?'
+      tokens[i - 2][0] = 'FUNC_EXIST' if tokens[i - 2]?[0] is '?' and prev[0] in EXPLICIT_CALL
       2
 
   # Because our grammar is LALR(1), it can't handle some single-line
