@@ -290,8 +290,8 @@ grammar =
 
   # Ordinary function invocation, or a chained series of calls.
   Invocation: [
-    o 'Value OptFuncExist Arguments',           -> new Call $1, $3, $2
-    o 'Invocation OptFuncExist Arguments',      -> new Call $1, $3, $2
+    o 'Value OptFuncExist OptApp Arguments',           -> new Call $1, $4, $2
+    o 'Invocation OptFuncExist OptApp Arguments',      -> new Call $1, $4, $2
     o 'SUPER',                                  -> new Call 'super', [new Splat new Literal 'arguments']
     o 'SUPER Arguments',                        -> new Call 'super', $2
   ]
@@ -300,6 +300,11 @@ grammar =
   OptFuncExist: [
     o '',                                       -> no
     o 'FUNC_EXIST',                             -> yes
+  ]
+
+  OptApp: [
+    o ''
+    o '<-'
   ]
 
   # The list of arguments to a function call.

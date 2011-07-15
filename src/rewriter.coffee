@@ -150,7 +150,7 @@ class exports.Rewriter
       return 1 if token.fromThen
       return 1 unless callObject or
         prev?.spaced and (prev.call or prev[0] in IMPLICIT_FUNC) and
-        (tag in IMPLICIT_CALL or not (token.spaced or token.newLine) and tag in IMPLICIT_UNSPACED_CALL)
+        (tag in IMPLICIT_CALL or not (token.spaced or token.newLine) and tag in IMPLICIT_UNSPACED_CALL) or prev and prev[0] in EXPLICIT_CALL
       tokens.splice i, 0, ['CALL_START', '(', token[2]]
       @detectEnd i + 1, (token, i) ->
         [tag] = token
@@ -158,7 +158,7 @@ class exports.Rewriter
         seenSingle  = yes if tag in ['IF', 'ELSE', 'CATCH', '->', '=>']
         seenControl = yes if tag in ['IF', 'ELSE', 'SWITCH', 'TRY']
         return yes if tag in ['.', '?.', '::'] and @tag(i - 1) is 'OUTDENT'
-        not token.generated and @tag(i - 1) isnt ',' and (tag in IMPLICIT_END or
+        not token.generated and @tag(i - 1) isnt ',' and @tag(i - 2) not in EXPLICIT_CALL and (tag in IMPLICIT_END or
         (tag is 'INDENT' and not seenControl)) and
         (tag isnt 'INDENT' or
          (@tag(i - 2) isnt 'CLASS' and @tag(i - 1) not in IMPLICIT_BLOCK and
@@ -316,13 +316,15 @@ IMPLICIT_CALL    = [
   '@', '->', '=>', '[', '(', '{', '--', '++'
 ]
 
+EXPLICIT_CALL    = ['<-']
+
 IMPLICIT_UNSPACED_CALL = ['+', '-']
 
 # Tokens indicating that the implicit call must enclose a block of expressions.
 IMPLICIT_BLOCK   = ['->', '=>', '{', '[', ',']
 
 # Tokens that always mark the end of an implicit call for single-liners.
-IMPLICIT_END     = ['POST_IF', 'FOR', 'WHILE', 'UNTIL', 'WHEN', 'BY', 'LOOP', 'TERMINATOR']
+IMPLICIT_END     = ['POST_IF', 'FOR', 'WHILE', 'UNTIL', 'WHEN', 'BY', 'LOOP', 'TERMINATOR', '<-']
 
 # Single-line flavors of block expressions that have unclosed endings.
 # The grammar can't disambiguate them, so we insert the implicit indentation.
