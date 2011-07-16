@@ -661,7 +661,7 @@ NOT_SPACED_REGEX = NOT_REGEX.concat ')', '}', 'THIS', 'IDENTIFIER', 'STRING'
 # Tokens which could legitimately be invoked or indexed. A opening
 # parentheses or bracket following these tokens will be recorded as the start
 # of a function invocation or indexing operation.
-CALLABLE  = ['IDENTIFIER', 'STRING', 'REGEX', ')', ']', '}', '?', '::', '@', 'THIS', 'SUPER', '<-', '<~']
+CALLABLE  = ['IDENTIFIER', 'STRING', 'REGEX', ')', ']', '}', '?', '::', '@', 'THIS', 'SUPER']
 INDEXABLE = CALLABLE.concat 'NUMBER', 'BOOL'
 
 # Tokens that, when immediately preceding a `WHEN`, indicate that the `WHEN`
