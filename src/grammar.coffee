@@ -293,8 +293,7 @@ grammar =
     o 'Value OptFuncExist OptApp Arguments',        -> new Call $1, $4, $2, $3
     o 'Invocation OptFuncExist OptApp Arguments',   -> new Call $1, $4, $2, $3
     o 'SUPER',                                      -> new Call 'super', [new Splat new Literal 'arguments']
-    o 'SUPER Arguments',                     -> new Call 'super', $2
-  # o 'SUPER OptApp Arguments' results in ambiguity for some reason?
+    o 'SUPER Arguments',                            -> new Call 'super', $2
   ]
 
   # An optional existence check on a function.

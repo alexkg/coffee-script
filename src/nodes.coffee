@@ -372,7 +372,7 @@ exports.Value = class Value extends Base
     last(@properties) instanceof Access
 
   getReceiver: ->
-    new Value @base, @properties.slice(0, -1), @tag # @tag is saved in ctor
+    new Value @base, @properties.slice(0, -1), @tag # @tag is saved in constructor
 
   makeReturn: ->
     if @properties.length then super() else @base.makeReturn()
@@ -456,7 +456,9 @@ exports.Call = class Call extends Base
     @isSuper  = variable is 'super'
     @variable = if @isSuper then null else variable
     @[tag]    = true if @tag
-    throw SyntaxError "can't curry 'new' or 'super' calls" if @curry and (@isNew or @isSuper)
+    if @curry
+      throw SyntaxError "can't curry `new` or `super` calls" if @isNew or @isSuper
+      throw SyntaxError "no args to curry and no receiver to bind" unless args.length or variable instanceof Value and variable.isAccess()
 
   children: ['variable', 'args']
 
@@ -546,10 +548,10 @@ exports.Call = class Call extends Base
     else
       fun = @variable.compile(o, LEVEL_ACCESS)
       if @curry
-        result = utility('curry') + ".call(#{fun}, #{args})"
         if @variable instanceof Value and @variable.isAccess()
-          result = utility('bind') + "(#{result}, #{@variable.getReceiver().compile(o)})"
-        result
+          fun = utility('bind') + "(#{fun}, #{@variable.getReceiver().compile(o)})"
+        fun = utility('curry') + ".call(#{fun}, #{args})" if args.length
+        fun
       else
         (if @isNew then 'new ' else '') + fun + "(#{args})"
 
@@ -586,10 +588,8 @@ exports.Call = class Call extends Base
       else
         ref = 'null'
     if @curry
-      curried = utility('curry') + ".call(#{fun}, #{splatArgs})"
-      if name
-        curried = utility('bind') + "(#{curried}, #{ref})"
-      curried
+      fun = utility('bind') + "(#{fun}, #{ref})" if name
+      utility('curry') + ".apply(#{fun}, #{splatArgs})"
     else
       "#{fun}.apply(#{ref}, #{splatArgs})"
 
@@ -1804,7 +1804,7 @@ UTILITIES =
     function(fn, me){ return function(){ return fn.apply(me, arguments); }; }
   '''
 
-  # Curried application
+  # Curried application. Can either `call` or `apply` with the receiver as the first argument.
   curry: '''
     function () {
       var f = this, xs = Array.prototype.slice.call(arguments);

@@ -143,17 +143,19 @@ class exports.Rewriter
       callObject  = not noCall and tag is 'INDENT' and
                     next and next.generated and next[0] is '{' and
                     prev and prev[0] in IMPLICIT_FUNC
+      explicit    = prev?[0] in EXPLICIT_CALL
       seenSingle  = no
       seenControl = no
       noCall      = no if tag in LINEBREAKS
       token.call  = yes if prev and not prev.spaced and tag is '?'
       return 1 if token.fromThen
-      return 1 unless callObject or
+      return 1 unless callObject or explicit or
         prev?.spaced and (prev.call or prev[0] in IMPLICIT_FUNC) and
-        (tag in IMPLICIT_CALL or not (token.spaced or token.newLine) and tag in IMPLICIT_UNSPACED_CALL) or prev?[0] in EXPLICIT_CALL and (tag in IMPLICIT_CALL or tag is 'INDENT')
+        (tag in IMPLICIT_CALL or not (token.spaced or token.newLine) and tag in IMPLICIT_UNSPACED_CALL)
       tokens.splice i, 0, ['CALL_START', '(', token[2]]
       @detectEnd i + 1, (token, i) ->
         [tag] = token
+        return yes if explicit and tag in IMPLICIT_END
         return yes if not seenSingle and token.fromThen
         seenSingle  = yes if tag in ['IF', 'ELSE', 'CATCH', '->', '=>']
         seenControl = yes if tag in ['IF', 'ELSE', 'SWITCH', 'TRY']
