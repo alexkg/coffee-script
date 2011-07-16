@@ -330,7 +330,7 @@ exports.Return = class Return extends Base
 # A value, variable or literal or parenthesized, indexed or dotted into,
 # or vanilla.
 exports.Value = class Value extends Base
-  constructor: (base, props, tag) ->
+  constructor: (base, props, @tag) ->
     return base if not props and base instanceof Value
     @base       = base
     @properties = props or []
@@ -367,6 +367,12 @@ exports.Value = class Value extends Base
 
   isSplice: ->
     last(@properties) instanceof Slice
+
+  isAccess: ->
+    last(@properties) instanceof Access
+
+  getReceiver: ->
+    new Value @base, @properties.slice(0, -1), @tag # @tag is saved in ctor
 
   makeReturn: ->
     if @properties.length then super() else @base.makeReturn()
@@ -445,12 +451,17 @@ exports.Comment = class Comment extends Base
 # Node for a function invocation. Takes care of converting `super()` calls into
 # calls against the prototype's function of the same name.
 exports.Call = class Call extends Base
-  constructor: (variable, @args = [], @soak) ->
+  constructor: (variable, @args = [], @soak, @tag) ->
     @isNew    = false
     @isSuper  = variable is 'super'
     @variable = if @isSuper then null else variable
+    @[tag]    = true if @tag
+    throw SyntaxError "can't curry 'new' or 'super' calls" if @curry and (@isNew or @isSuper)
 
   children: ['variable', 'args']
+
+  toString: (idt) ->
+    super idt, @constructor.name + ('~' if @curry)
 
   # Tag this invocation as creating a new instance.
   newInstance: ->
@@ -533,7 +544,14 @@ exports.Call = class Call extends Base
     if @isSuper
       @superReference(o) + ".call(this#{ args and ', ' + args })"
     else
-      (if @isNew then 'new ' else '') + @variable.compile(o, LEVEL_ACCESS) + "(#{args})"
+      fun = @variable.compile(o, LEVEL_ACCESS)
+      if @curry
+        result = utility('curry') + ".call(#{fun}, #{args})"
+        if @variable instanceof Value and @variable.isAccess()
+          result = utility('bind') + "(#{result}, #{@variable.getReceiver().compile(o)})"
+        result
+      else
+        (if @isNew then 'new ' else '') + fun + "(#{args})"
 
   # `super()` is converted into a call against the superclass's implementation
   # of the current function.
@@ -567,7 +585,15 @@ exports.Call = class Call extends Base
         fun += name.compile o
       else
         ref = 'null'
-    "#{fun}.apply(#{ref}, #{splatArgs})"
+    if @curry
+      curried = utility('curry') + ".call(#{fun}, #{splatArgs})"
+      if name
+        curried = utility('bind') + "(#{curried}, #{ref})"
+      curried
+    else
+      "#{fun}.apply(#{ref}, #{splatArgs})"
+
+    
 
 #### Extends
 
@@ -1776,6 +1802,17 @@ UTILITIES =
   # Create a function bound to the current value of "this".
   bind: '''
     function(fn, me){ return function(){ return fn.apply(me, arguments); }; }
+  '''
+
+  # Curried application
+  curry: '''
+    function () {
+      var f = this, xs = Array.prototype.slice.call(arguments);
+      return function () {
+        var ys = Array.prototype.slice.call(arguments);
+        return f.apply(this, xs.concat(ys));
+      }
+    }
   '''
 
   # Discover if an item is in an array.

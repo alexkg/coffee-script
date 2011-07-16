@@ -290,10 +290,11 @@ grammar =
 
   # Ordinary function invocation, or a chained series of calls.
   Invocation: [
-    o 'Value OptFuncExist OptApp Arguments',           -> new Call $1, $4, $2
-    o 'Invocation OptFuncExist OptApp Arguments',      -> new Call $1, $4, $2
-    o 'SUPER',                                  -> new Call 'super', [new Splat new Literal 'arguments']
-    o 'SUPER Arguments',                        -> new Call 'super', $2
+    o 'Value OptFuncExist OptApp Arguments',        -> new Call $1, $4, $2, $3
+    o 'Invocation OptFuncExist OptApp Arguments',   -> new Call $1, $4, $2, $3
+    o 'SUPER',                                      -> new Call 'super', [new Splat new Literal 'arguments']
+    o 'SUPER Arguments',                     -> new Call 'super', $2
+  # o 'SUPER OptApp Arguments' results in ambiguity for some reason?
   ]
 
   # An optional existence check on a function.
@@ -302,9 +303,11 @@ grammar =
     o 'FUNC_EXIST',                             -> yes
   ]
 
+  # Application operator
   OptApp: [
     o ''
     o '<-'
+    o '<~',                                     -> 'curry'
   ]
 
   # The list of arguments to a function call.
