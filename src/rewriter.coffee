@@ -153,7 +153,7 @@ class exports.Rewriter
         prev?.spaced and (prev.call or prev[0] in IMPLICIT_FUNC) and
         (tag in IMPLICIT_CALL or not (token.spaced or token.newLine) and tag in IMPLICIT_UNSPACED_CALL)
       tokens.splice i, 0, ['CALL_START', '(', token[2]]
-      if explicit and tag is ','
+      if explicit and tag is ',' # allows parameterless call in argument list
         action.call this, next, i + 1
         return 2
       @detectEnd i + 1, (token, i) ->
@@ -163,16 +163,15 @@ class exports.Rewriter
         seenSingle  = yes if tag in ['IF', 'ELSE', 'CATCH', '->', '=>']
         seenControl = yes if tag in ['IF', 'ELSE', 'SWITCH', 'TRY']
         return yes if tag in ['.', '?.', '::'] and @tag(i - 1) is 'OUTDENT'
-        not token.generated and @tag(i - 1) isnt ',' and
-        (tag in IMPLICIT_END or (tag is 'INDENT' and not seenControl)) and
+        not token.generated and @tag(i - 1) isnt ',' and (tag in IMPLICIT_END or
+        (tag is 'INDENT' and not seenControl)) and
         (tag isnt 'INDENT' or
-          (@tag(i - 2) isnt 'CLASS' and @tag(i - 2) not in EXPLICIT_CALL and @tag(i - 1) not in IMPLICIT_BLOCK and
-            not ((post = @tokens[i + 1]) and post.generated and post[0] is '{')))
+         (@tag(i - 2) isnt 'CLASS' and @tag(i - 1) not in IMPLICIT_BLOCK and @tag(i - 2) not in EXPLICIT_CALL and
+          not ((post = @tokens[i + 1]) and post.generated and post[0] is '{')))
       , action
       exist = tokens[i - if prev[0] in EXPLICIT_CALL then 2 else 1]
       exist[0] = 'FUNC_EXIST' if exist?[0] is '?'
       2
-
 
   # Because our grammar is LALR(1), it can't handle some single-line
   # expressions that lack ending delimiters. The **Rewriter** adds the implicit
@@ -215,7 +214,7 @@ class exports.Rewriter
       return 1 unless token[0] is 'IF'
       original = token
       @detectEnd i + 1, condition, (token, i) ->
-        original[0] = 'POST_' + original[0] if @tokens[i-1][0] in EXPLICIT_CALL or token[0] isnt 'INDENT'
+        original[0] = 'POST_' + original[0] if token[0] isnt 'INDENT' or @tokens[i-1][0] in EXPLICIT_CALL
       1
 
   # Ensure that all listed pairs of tokens are correctly balanced throughout

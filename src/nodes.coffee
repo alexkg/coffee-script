@@ -330,7 +330,7 @@ exports.Return = class Return extends Base
 # A value, variable or literal or parenthesized, indexed or dotted into,
 # or vanilla.
 exports.Value = class Value extends Base
-  constructor: (base, props, @tag) ->
+  constructor: (base, props, tag) ->
     return base if not props and base instanceof Value
     @base       = base
     @properties = props or []
@@ -372,7 +372,7 @@ exports.Value = class Value extends Base
     last(@properties) instanceof Access
 
   getReceiver: ->
-    new Value @base, @properties.slice(0, -1), @tag # @tag is saved in constructor
+    new Value @base, @properties.slice(0, -1) # need to add tag?
 
   makeReturn: ->
     if @properties.length then super() else @base.makeReturn()
@@ -451,11 +451,11 @@ exports.Comment = class Comment extends Base
 # Node for a function invocation. Takes care of converting `super()` calls into
 # calls against the prototype's function of the same name.
 exports.Call = class Call extends Base
-  constructor: (variable, @args = [], @soak, @tag) ->
+  constructor: (variable, @args = [], @soak, tag) ->
     @isNew    = false
     @isSuper  = variable is 'super'
     @variable = if @isSuper then null else variable
-    @[tag]    = true if @tag
+    @[tag]    = true if tag
     if @curry
       throw SyntaxError "can't curry `new` or `super` calls" if @isNew or @isSuper
       throw SyntaxError "no args to curry and no receiver to bind" unless args.length or variable instanceof Value and variable.isAccess()
@@ -547,13 +547,13 @@ exports.Call = class Call extends Base
       @superReference(o) + ".call(this#{ args and ', ' + args })"
     else
       fun = @variable.compile(o, LEVEL_ACCESS)
-      if @curry
-        if @variable instanceof Value and @variable.isAccess()
-          fun = utility('bind') + "(#{fun}, #{@variable.getReceiver().compile(o)})"
-        fun = utility('curry') + ".call(#{fun}, #{args})" if args.length
-        fun
-      else
-        (if @isNew then 'new ' else '') + fun + "(#{args})"
+      unless @curry
+        return (if @isNew then 'new ' else '') + fun + "(#{args})"
+      if @variable instanceof Value and @variable.isAccess()
+        fun = utility('bind') + "(#{fun}, #{@variable.getReceiver().compile(o)})"
+      if args.length
+        fun = utility('curry') + ".call(#{fun}, #{args})"
+      fun
 
   # `super()` is converted into a call against the superclass's implementation
   # of the current function.
@@ -587,11 +587,11 @@ exports.Call = class Call extends Base
         fun += name.compile o
       else
         ref = 'null'
-    if @curry
-      fun = utility('bind') + "(#{fun}, #{ref})" if name
-      utility('curry') + ".apply(#{fun}, #{splatArgs})"
-    else
-      "#{fun}.apply(#{ref}, #{splatArgs})"
+    unless @curry
+      return "#{fun}.apply(#{ref}, #{splatArgs})"
+    fun = utility('bind') + "(#{fun}, #{ref})" if name
+    utility('curry') + ".apply(#{fun}, #{splatArgs})"
+      
 
     
 
