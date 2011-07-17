@@ -71,19 +71,15 @@ test "compatible with post if", ->
   """, bare:on
   eq out, "return f(b?1:2)"
 
-test "compatible with @", ->
+test "receiver binding compatible with @", ->
   o =
     thing: 'thing'
     toString: -> @thing
     getToString: -> @toString <~
   
-  s = o.getToString()
-  eq o.toString(), s <-
+  s = o.getToString <-
+  eq o.toString <-, s <-
 
-test "compatible with nested functions", ->
-  out = compact CoffeeScript.compile """
-  ->
-    ->
-      result <- if b then x <- 5 else y <- 9
-  """, bare:on
-  eq out, "(function(){return function(){return result(b?x(5):y(9))}})"
+test "currying a call to `call`", ->
+  f = (-> @thing).call <~ (thing: 'umbrella')
+  eq f <-, 'umbrella'
