@@ -290,7 +290,9 @@ grammar =
   ]
 
   Package: [
+    o 'PACKAGE',                                      -> new Package
     o 'PACKAGE Block',                                -> new Package null, $2
+    o 'PACKAGE SimpleAssignable',                     -> new Package $2
     o 'PACKAGE SimpleAssignable Block',               -> new Package $2, $3
   ]
 
@@ -572,7 +574,7 @@ operators = [
   ['nonassoc',  'INDENT', 'OUTDENT']
   ['right',     '=', ':', 'COMPOUND_ASSIGN', 'RETURN', 'THROW', 'EXTENDS']
   ['right',     'FORIN', 'FOROF', 'BY', 'WHEN']
-  ['right',     'IF', 'ELSE', 'FOR', 'DO', 'WHILE', 'UNTIL', 'LOOP', 'SUPER', 'CLASS']
+  ['right',     'IF', 'ELSE', 'FOR', 'DO', 'WHILE', 'UNTIL', 'LOOP', 'SUPER', 'CLASS', 'PACKAGE']
   ['right',     'POST_IF']
 ]
 

@@ -1,3 +1,7 @@
+test "empty package", ->
+  x = {}
+  package x.y
+    
 test "root name is unresolved", ->
 
   try
