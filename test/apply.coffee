@@ -1,4 +1,8 @@
-compact = (out) -> out.replace /[ ;]/g, ''
+compact = (out) ->
+  out = out.replace(/(\w)[\s]+(\W)/gm, "$1$2")
+  out = out.replace(/(\W)[\s]+(\W)/gm, "$1$2")
+  out = out.replace(/(\W)[\s]+(\w)/gm, "$1$2")
+  out = out.replace(/;/g, "")
 
 sum = (xs) -> xs.reduce (x,y) -> x+y 
 
@@ -60,7 +64,7 @@ test "compatible with post if", ->
   f = (x,y) -> x+y
   r = f <- 1,2 if true
   eq r, 3
-  
+
 test "compatible with @", ->
   o =
     thing: 'thing'
@@ -69,3 +73,11 @@ test "compatible with @", ->
   
   s = o.getToString()
   eq o.toString(), s <-
+
+test "compatible with nested functions", ->
+  out = compact CoffeeScript.compile """
+  ->
+    ->
+      result <- if b then x <- 5 else y <- 9
+  """, bare:on
+  eq out, "(function(){return function(){return result(b?x(5):y(9))}})"
