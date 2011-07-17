@@ -61,9 +61,15 @@ test "compatible with splats", ->
   eq 15, g <- [4,5]...
   
 test "compatible with post if", ->
-  f = (x,y) -> x+y
-  r = f <- 1,2 if true
-  eq r, 3
+  out = compact CoffeeScript.compile """
+  return f <- 1,2 if b
+  """, bare:on
+  eq out, "if(b){return f(1,2)}"
+  
+  out = compact CoffeeScript.compile """
+  return f <- if b then 1 else 2
+  """, bare:on
+  eq out, "return f(b?1:2)"
 
 test "compatible with @", ->
   o =
