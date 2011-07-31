@@ -9,10 +9,13 @@ CoffeeScript = require './coffee-script'
 readline     = require 'readline'
 {inspect}    = require 'util'
 {Script}     = require 'vm'
+Module       = require 'module'
 
 # REPL Setup
 
 # Config
+REPL_PROMPT = 'coffee> '
+REPL_PROMPT_CONTINUATION = '......> '
 enableColours = no
 unless process.platform is 'win32'
   enableColours = not process.env.NODE_DISABLE_COLORS
@@ -28,32 +31,45 @@ error = (err) ->
 # The current backlog of multi-line code.
 backlog = ''
 
+# The REPL context; must be visible outside `run` to allow for tab completion
+sandbox = Script.createContext()
+nonContextGlobals = [
+  'Buffer', 'console', 'process'
+  'setInterval', 'clearInterval'
+  'setTimeout', 'clearTimeout'
+]
+sandbox[g] = global[g] for g in nonContextGlobals
+sandbox.global = sandbox.root = sandbox.GLOBAL = sandbox
+
 # The main REPL function. **run** is called every time a line of code is entered.
 # Attempt to evaluate the command. If there's an exception, print it out instead
 # of exiting.
-run = do ->
-  sandbox =
-    require: require
-    module : { exports: {} }
-  sandbox[g] = global[g] for g in Object.getOwnPropertyNames global
-  sandbox.global = sandbox
-  sandbox.global.global = sandbox.global.root = sandbox.global.GLOBAL = sandbox
-  (buffer) ->
-    code = backlog += '\n' + buffer.toString()
-    if code[code.length - 1] is '\\'
-      return backlog = backlog[0...backlog.length - 1]
-    backlog = ''
-    try
-      val = CoffeeScript.eval code, {
-        sandbox,
-        bare: on,
-        filename: 'repl'
-      }
-      unless val is undefined
-        process.stdout.write inspect(val, no, 2, enableColours) + '\n'
-    catch err
-      error err
+run = (buffer) ->
+  if !buffer.toString().trim() and !backlog
     repl.prompt()
+    return
+  code = backlog += buffer
+  if code[code.length - 1] is '\\'
+    backlog = "#{backlog[...-1]}\n"
+    repl.setPrompt REPL_PROMPT_CONTINUATION
+    repl.prompt()
+    return
+  repl.setPrompt REPL_PROMPT
+  backlog = ''
+  try
+    _ = sandbox._
+    returnValue = CoffeeScript.eval "_=(#{code}\n)", {
+      sandbox,
+      filename: 'repl'
+      modulename: 'repl'
+    }
+    if returnValue is undefined
+      sandbox._ = _
+    else
+      process.stdout.write inspect(returnValue, no, 2, enableColours) + '\n'
+  catch err
+    error err
+  repl.prompt()
 
 ## Autocompletion
 
@@ -70,26 +86,23 @@ completeAttribute = (text) ->
   if match = text.match ACCESSOR
     [all, obj, prefix] = match
     try
-      val = Script.runInThisContext obj
+      val = Script.runInContext obj, sandbox
     catch error
-      return [[], text]
-    completions = getCompletions prefix, getPropertyNames val
+      return
+    completions = getCompletions prefix, Object.getOwnPropertyNames val
     [completions, prefix]
 
 # Attempt to autocomplete an in-scope free variable: `one`.
 completeVariable = (text) ->
-  if free = text.match(SIMPLEVAR)?[1]
-    scope = Script.runInThisContext 'this'
-    completions = getCompletions free, CoffeeScript.RESERVED.concat(getPropertyNames scope)
+  if free = (text.match SIMPLEVAR)?[1]
+    vars = Script.runInContext 'Object.getOwnPropertyNames(this)', sandbox
+    possibilities = vars.concat CoffeeScript.RESERVED
+    completions = getCompletions free, possibilities
     [completions, free]
 
 # Return elements of candidates for which `prefix` is a prefix.
 getCompletions = (prefix, candidates) ->
   (el for el in candidates when el.indexOf(prefix) is 0)
-
-# Return all "own" properties of an object.
-getPropertyNames = (obj) ->
-  (name for own name of obj)
 
 # Make sure that uncaught exceptions don't kill the REPL.
 process.on 'uncaughtException', error
@@ -101,7 +114,20 @@ if readline.createInterface.length < 3
 else
   repl = readline.createInterface stdin, stdout, autocomplete
 
-repl.setPrompt 'coffee> '
-repl.on  'close',  -> stdin.destroy()
-repl.on  'line',   run
+repl.on 'attemptClose', ->
+  if backlog
+    backlog = ''
+    process.stdout.write '\n'
+    repl.setPrompt REPL_PROMPT
+    repl.prompt()
+  else
+    repl.close()
+
+repl.on 'close', ->
+  process.stdout.write '\n'
+  stdin.destroy()
+
+repl.on 'line', run
+
+repl.setPrompt REPL_PROMPT
 repl.prompt()
