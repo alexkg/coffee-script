@@ -961,7 +961,8 @@ exports.Package = class Package extends Base
         child.expressions = exps = flatten exps
 
   compileNode: (o) ->
-    name = @determineName() or '_Package'
+    name = @determineName()
+    name = '_Package' if not name? or name is 'this'
     nameLiteral = new Literal name
     nameValue   = new Value nameLiteral
     
@@ -975,7 +976,7 @@ exports.Package = class Package extends Base
     scopeParameters = []
     scopeArguments = []
     pre = []
-    if @variable
+    if @variable and @variable.properties.length
       seed = @variable.base
     
       for access in @variable.properties
@@ -987,7 +988,7 @@ exports.Package = class Package extends Base
         pre.push line
     else
       scopeParameters.push nameValue
-      scopeArguments.push new Obj
+      scopeArguments.push if @variable then @variable else new Obj
     
     pre = Block.wrap pre
 

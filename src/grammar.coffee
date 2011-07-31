@@ -292,6 +292,8 @@ grammar =
   Package: [
     o 'PACKAGE',                                      -> new Package
     o 'PACKAGE Block',                                -> new Package null, $2
+    o 'PACKAGE This',                                 -> new Package $2
+    o 'PACKAGE This Block',                           -> new Package $2, $3
     o 'PACKAGE SimpleAssignable',                     -> new Package $2
     o 'PACKAGE SimpleAssignable Block',               -> new Package $2, $3
   ]

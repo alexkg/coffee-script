@@ -2,6 +2,13 @@ test "empty package", ->
   x = {}
   package x.y
     
+test "this package", ->
+  o = new ->
+    package this
+      @x = 5
+    this
+  eq o.x, 5
+
 test "root name is unresolved", ->
 
   try
