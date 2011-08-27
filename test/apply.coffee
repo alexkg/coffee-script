@@ -69,7 +69,7 @@ test "compatible with post if", ->
   out = compact CoffeeScript.compile """
   return f <- 1,2 if b
   """, bare:on
-  eq out, "if(b){return f(1,2)}"
+  eq out, "if(b)return f(1,2)"
   
   out = compact CoffeeScript.compile """
   return f <- if b then 1 else 2

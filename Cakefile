@@ -1,6 +1,6 @@
 fs            = require 'fs'
 path          = require 'path'
-{extend}      = require './lib/helpers'
+{extend}      = require './lib/coffee-script/helpers'
 CoffeeScript  = require './lib/coffee-script'
 {spawn, exec} = require 'child_process'
 
@@ -22,10 +22,9 @@ header = """
 """
 
 sources = [
-  'src/coffee-script.coffee', 'src/grammar.coffee'
-  'src/helpers.coffee', 'src/lexer.coffee', 'src/nodes.coffee'
-  'src/rewriter.coffee', 'src/scope.coffee'
-]
+  'coffee-script', 'grammar', 'helpers'
+  'lexer', 'nodes', 'rewriter', 'scope'
+].map (filename) -> "src/#{filename}.coffee"
 
 # Run a CoffeeScript through our node/coffee interpreter.
 run = (args, cb) ->
@@ -55,7 +54,7 @@ task 'install', 'install CoffeeScript into /usr/local (or --prefix)', (options) 
     "ln -sfn #{lib}/bin/coffee #{bin}/coffee"
     "ln -sfn #{lib}/bin/cake #{bin}/cake"
     "mkdir -p ~/.node_libraries"
-    "ln -sfn #{lib}/lib #{node}"
+    "ln -sfn #{lib}/lib/coffee-script #{node}"
   ].join(' && '), (err, stdout, stderr) ->
     if err then console.log stderr.trim() else log 'done', green
   )
@@ -64,20 +63,22 @@ task 'install', 'install CoffeeScript into /usr/local (or --prefix)', (options) 
 task 'build', 'build the CoffeeScript language from source', build = (cb) ->
   files = fs.readdirSync 'src'
   files = ('src/' + file for file in files when file.match(/\.coffee$/))
-  run ['-c', '-o', 'lib'].concat(files), cb
+  run ['-c', '-o', 'lib/coffee-script'].concat(files), cb
 
 
 task 'build:full', 'rebuild the source twice, and run the tests', ->
   build ->
     build ->
-      process.exit 1 unless runTests CoffeeScript
+      csPath = fs.realpathSync './lib/coffee-script'
+      unless runTests require csPath
+        process.exit 1
 
 
 task 'build:parser', 'rebuild the Jison parser (run build first)', ->
   extend global, require('util')
   require 'jison'
-  parser = require('./lib/grammar').parser
-  fs.writeFile 'lib/parser.js', parser.generate()
+  parser = require('./lib/coffee-script/grammar').parser
+  fs.writeFile 'lib/coffee-script/parser.js', parser.generate()
 
 
 task 'build:ultraviolet', 'build and install the Ultraviolet syntax highlighter', ->
@@ -92,7 +93,7 @@ task 'build:browser', 'rebuild the merged script for inclusion in the browser', 
     code += """
       require['./#{name}'] = new function() {
         var exports = this;
-        #{fs.readFileSync "lib/#{name}.js"}
+        #{fs.readFileSync "lib/coffee-script/#{name}.js"}
       };
     """
   code = """
@@ -125,7 +126,7 @@ task 'doc:underscore', 'rebuild the Underscore.coffee documentation page', ->
     throw err if err
 
 task 'bench', 'quick benchmark of compilation time', ->
-  {Rewriter} = require './lib/rewriter'
+  {Rewriter} = require './lib/coffee-script/rewriter'
   co     = sources.map((name) -> fs.readFileSync name).join '\n'
   fmt    = (ms) -> " #{bold}#{ "   #{ms}".slice -4 }#{reset} ms"
   total  = 0
