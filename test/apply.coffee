@@ -23,8 +23,11 @@ test "application with no arguments corresponds to bare function call", ->
   out = compact CoffeeScript.compile "send 4, f <-, 5", bare:on
   eq out, "send(4,f(),5)"
 
-test "currying with no arguments and no receiver is a syntax error", ->
-  throws (-> CoffeeScript.compile "f <~"), "throws syntax error"
+test "currying with no arguments and no receiver returns the function reapplied", ->
+  f = (x) -> x + 1000
+  g = f <~
+  eq f(666), g(666)
+  ok f isnt g
 
 test "currying with no arguments returns the function bound to the receiver", ->
 	goon = 

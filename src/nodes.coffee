@@ -462,9 +462,7 @@ exports.Call = class Call extends Base
     @isSuper  = variable is 'super'
     @variable = if @isSuper then null else variable
     @[tag]    = true if tag
-    if @curry
-      throw SyntaxError "can't curry `new` or `super` calls" if @isNew or @isSuper
-      throw SyntaxError "no args to curry and no receiver to bind" unless args.length or variable instanceof Value and variable.isAccess()
+    throw SyntaxError "can't curry `new` or `super` calls" if @curry and (@isNew or @isSuper)
 
   children: ['variable', 'args']
 
@@ -556,12 +554,17 @@ exports.Call = class Call extends Base
       @superReference(o) + ".call(this#{ args and ', ' + args })"
     else
       fun = @variable.compile(o, LEVEL_ACCESS)
-      unless @curry
-        return (if @isNew then 'new ' else '') + fun + "(#{args})"
+      return (if @isNew then 'new ' else '') + fun + "(#{args})" unless @curry
+
       if @variable instanceof Value and @variable.isAccess()
-        fun = utility('bind') + "(#{fun}, #{@variable.getReceiver().compile(o)})"
+        fun = "#{utility('bind')}(#{fun}, #{@variable.getReceiver().compile(o)})"
+      
+      else unless args.length
+        fun = "#{utility('curry')}.call(#{fun})"
+
       if args.length
-        fun = utility('curry') + ".call(#{fun}, #{args})"
+        fun = "#{utility('curry')}.call(#{fun}, #{args})"
+        
       fun
 
   # `super()` is converted into a call against the superclass's implementation
