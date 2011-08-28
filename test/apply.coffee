@@ -7,8 +7,8 @@ compact = (out) ->
 join = (xs...) -> xs.join ' '
 
 test "application (and curried application) associates to the left", ->
-  out = compact CoffeeScript.compile "f <- x,y <- z", bare:on
-  eq out, 'f(x,y)(z)'
+  out = compact CoffeeScript.compile "f <- x, y <- z", bare:on
+  eq out, 'f(x,y(z))'
 
 test "application with no arguments corresponds to bare function call", ->
   out = compact CoffeeScript.compile "f <-", bare:on
@@ -57,8 +57,21 @@ test "indentation determines call nesting", ->
       o <- p
       q <- r
   """, bare:on
-  eq out, 'a(b(c(d,e)(f),g(h,j)(k)),l(m,n,o(p),q(r)))'
+  eq out, 'a(b(c(d,e(f)),g(h,j(k))),l(m,n,o(p),q(r)))'
 
+test "form equivalence", ->
+  inline = compact CoffeeScript.compile """
+  f <- x, y <- z
+  """, bare:on
+
+  block = compact CoffeeScript.compile """
+  f <-
+    x
+    y <- z
+  """, bare:on
+
+  eq inline, block
+  
 test "compatible with splats", ->
 	sum = (args...) ->
 	  args.reduce (x, y) -> x + y

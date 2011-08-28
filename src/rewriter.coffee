@@ -158,7 +158,7 @@ class exports.Rewriter
         return 2
       @detectEnd i + 1, (token, i) ->
         [tag] = token
-        return yes if explicit and (tag in IMPLICIT_END or tag in EXPLICIT_CALL)
+        return yes if explicit and tag in IMPLICIT_END
         return yes if not seenSingle and token.fromThen
         seenSingle  = yes if tag in ['IF', 'ELSE', 'CATCH', '->', '=>']
         seenControl = yes if tag in ['IF', 'ELSE', 'SWITCH', 'TRY']
