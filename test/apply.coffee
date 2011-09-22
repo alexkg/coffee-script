@@ -2,6 +2,8 @@ compact = (out) ->
   out = out.replace(/(\w)[\s]+(\W)/gm, "$1$2")
   out = out.replace(/(\W)[\s]+(\W)/gm, "$1$2")
   out = out.replace(/(\W)[\s]+(\w)/gm, "$1$2")
+  out = out.replace(/^\s+/g, "")
+  out = out.replace(/\s+$/g, "")
   out = out.replace(/;/g, "")
 
 join = (xs...) -> xs.join ' '
