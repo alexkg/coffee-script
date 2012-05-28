@@ -77,7 +77,6 @@ grammar =
   # Pure statements which cannot be expressions.
   Statement: [
     o 'Return'
-    o 'Throw'
     o 'Comment'
     o 'STATEMENT',                              -> new Literal $1
   ]
@@ -98,6 +97,7 @@ grammar =
     o 'For'
     o 'Switch'
     o 'Class'
+    o 'Throw'
   ]
 
   # An indented block of expressions. Note that the [Rewriter](rewriter.html)
@@ -126,15 +126,16 @@ grammar =
     o 'AlphaNumeric'
     o 'JS',                                     -> new Literal $1
     o 'REGEX',                                  -> new Literal $1
-    o 'BOOL',                                   ->
-      val = new Literal $1
-      val.isUndefined = yes if $1 is 'undefined'
-      val
+    o 'DEBUGGER',                               -> new Literal $1
+    o 'UNDEFINED',                              -> new Undefined
+    o 'NULL',                                   -> new Null
+    o 'BOOL',                                   -> new Bool $1
   ]
 
   # Assignment of a variable, property, or index to a value.
   Assign: [
     o 'Assignable = Expression',                -> new Assign $1, $3
+    o 'Assignable = TERMINATOR Expression',     -> new Assign $1, $4
     o 'Assignable = INDENT Expression OUTDENT', -> new Assign $1, $4
   ]
 
@@ -191,6 +192,8 @@ grammar =
     o '',                                       -> []
     o 'Param',                                  -> [$1]
     o 'ParamList , Param',                      -> $1.concat $3
+    o 'ParamList OptComma TERMINATOR Param',    -> $1.concat $4
+    o 'ParamList OptComma INDENT ParamList OptComma OUTDENT', -> $1.concat $4
   ]
 
   # A single parameter in a function definition can be ordinary, or a splat
@@ -218,7 +221,7 @@ grammar =
   SimpleAssignable: [
     o 'Identifier',                             -> new Value $1
     o 'Value Accessor',                         -> $1.add $2
-    o 'Invocation Accessor',                    -> new Value $1, [$2]
+    o 'Invocation Accessor',                    -> new Value $1, [].concat $2
     o 'ThisProperty'
   ]
 
@@ -348,6 +351,7 @@ grammar =
     o 'Expression RangeDots Expression',        -> new Range $1, $3, $2
     o 'Expression RangeDots',                   -> new Range $1, null, $2
     o 'RangeDots Expression',                   -> new Range null, $2, $1
+    o 'RangeDots',                              -> new Range null, null, $1
   ]
 
   # The **ArgList** is both the list of objects passed into a function call,
@@ -447,6 +451,7 @@ grammar =
   # This enables support for pattern matching.
   ForValue: [
     o 'Identifier'
+    o 'ThisProperty'
     o 'Array',                                  -> new Value $1
     o 'Object',                                 -> new Value $1
   ]
@@ -535,7 +540,7 @@ grammar =
     o 'Expression LOGIC    Expression',         -> new Op $2, $1, $3
     o 'Expression RELATION Expression',         ->
       if $2.charAt(0) is '!'
-        new Op($2.slice(1), $1, $3).invert()
+        new Op($2[1..], $1, $3).invert()
       else
         new Op $2, $1, $3
 
@@ -573,7 +578,7 @@ operators = [
   ['nonassoc',  'INDENT', 'OUTDENT']
   ['right',     '=', ':', 'COMPOUND_ASSIGN', 'RETURN', 'THROW', 'EXTENDS']
   ['right',     'FORIN', 'FOROF', 'BY', 'WHEN']
-  ['right',     'IF', 'ELSE', 'FOR', 'DO', 'WHILE', 'UNTIL', 'LOOP', 'SUPER', 'CLASS']
+  ['right',     'IF', 'ELSE', 'FOR', 'WHILE', 'UNTIL', 'LOOP', 'SUPER', 'CLASS']
   ['right',     'POST_IF']
 ]
 

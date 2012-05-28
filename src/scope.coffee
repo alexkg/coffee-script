@@ -25,15 +25,24 @@ exports.Scope = class Scope
   # Adds a new variable or overrides an existing one.
   add: (name, type, immediate) ->
     return @parent.add name, type, immediate if @shared and not immediate
-    if typeof (pos = @positions[name]) is 'number'
-      @variables[pos].type = type
+    if Object::hasOwnProperty.call @positions, name
+      @variables[@positions[name]].type = type
     else
       @positions[name] = @variables.push({name, type}) - 1
 
+  # When `super` is called, we need to find the name of the current method we're 
+  # in, so that we know how to invoke the same method of the parent class. This 
+  # can get complicated if super is being called from an inner function. 
+  # `namedMethod` will walk up the scope tree until it either finds the first 
+  # function object that has a name filled in, or bottoms out.
+  namedMethod: ->
+    return @method if @method.name or !@parent
+    @parent.namedMethod()
+
   # Look up a variable name in lexical scope, and declare it if it does not
   # already exist.
-  find: (name, options) ->
-    return yes if @check name, options
+  find: (name) ->
+    return yes if @check name
     @add name, 'var'
     no
 
@@ -45,15 +54,13 @@ exports.Scope = class Scope
 
   # Just check to see if a variable has already been declared, without reserving,
   # walks up to the root scope.
-  check: (name, immediate) ->
-    found = !!@type(name)
-    return found if found or immediate
-    !!@parent?.check name
+  check: (name) ->
+    !!(@type(name) or @parent?.check(name))
 
   # Generate a temporary variable name at the given index.
   temporary: (name, index) ->
     if name.length > 1
-      '_' + name + if index > 1 then index else ''
+      '_' + name + if index > 1 then index - 1 else ''
     else
       '_' + (index + parseInt name, 36).toString(36).replace /\d/g, 'a'
 
@@ -64,16 +71,16 @@ exports.Scope = class Scope
 
   # If we need to store an intermediate result, find an available name for a
   # compiler-generated variable. `_var`, `_var2`, and so on...
-  freeVariable: (type) ->
+  freeVariable: (name, reserve=true) ->
     index = 0
-    index++ while @check((temp = @temporary type, index))
-    @add temp, 'var', yes
+    index++ while @check((temp = @temporary name, index))
+    @add temp, 'var', yes if reserve
     temp
 
   # Ensure that an assignment is made at the top of this scope
   # (or at the top-level scope, if requested).
   assign: (name, value) ->
-    @add name, value: value, assigned: true
+    @add name, {value, assigned: yes}, yes
     @hasAssignments = yes
 
   # Does this scope have any declared variables?

@@ -274,6 +274,25 @@ test "nothing classes", ->
   ok c instanceof Function
 
 
+test "classes with static-level implicit objects", ->
+
+  class A
+    @static = one: 1
+    two: 2
+
+  class B
+    @static = one: 1,
+    two: 2
+
+  eq A.static.one, 1
+  eq A.static.two, undefined
+  eq (new A).two, 2
+
+  eq B.static.one, 1
+  eq B.static.two, 2
+  eq (new B).two, undefined
+
+
 test "classes with value'd constructors", ->
 
   counter = 0
@@ -471,6 +490,7 @@ test "#1182: execution order needs to be considered as well", ->
 test "#1182: external constructors with bound functions", ->
   fn = ->
     {one: 1}
+    this
   class B
   class A
     constructor: fn
@@ -527,3 +547,132 @@ test "#1598: super works for static methods too", ->
       'pass? ' + super
 
   eq Child.method(), 'pass? yes'
+
+test "#1842: Regression with bound functions within bound class methods", ->
+
+  class Store
+    @bound: =>
+      do =>
+        eq this, Store
+
+  Store.bound()
+
+  # And a fancier case:
+
+  class Store
+
+    eq this, Store
+
+    @bound: =>
+      do =>
+        eq this, Store
+
+    @unbound: ->
+      eq this, Store
+
+    instance: =>
+      ok this instanceof Store
+
+  Store.bound()
+  Store.unbound()
+  (new Store).instance()
+
+test "#1876: Class @A extends A", ->
+  class A
+  class @A extends A
+
+  ok (new @A) instanceof A
+
+test "#1813: Passing class definitions as expressions", ->
+  ident = (x) -> x
+
+  result = ident class A then x = 1
+
+  eq result, A
+
+  result = ident class B extends A
+    x = 1
+
+  eq result, B
+
+test "#1966: external constructors should produce their return value", ->
+  ctor = -> {}
+  class A then constructor: ctor
+  ok (new A) not instanceof A
+
+test "#1980: regression with an inherited class with static function members", ->
+
+  class A
+
+  class B extends A
+    @static: => 'value'
+
+  eq B.static(), 'value'
+
+test "#1534: class then 'use strict'", ->
+  # [14.1 Directive Prologues and the Use Strict Directive](http://es5.github.com/#x14.1)
+  nonce = {}
+  error = 'do -> ok this'
+  strictTest = "do ->'use strict';#{error}"
+  return unless (try CoffeeScript.run strictTest, bare: yes catch e then nonce) is nonce
+
+  throws -> CoffeeScript.run "class then 'use strict';#{error}", bare: yes
+  doesNotThrow -> CoffeeScript.run "class then #{error}", bare: yes
+  doesNotThrow -> CoffeeScript.run "class then #{error};'use strict'", bare: yes
+
+  # comments are ignored in the Directive Prologue
+  comments = ["""
+  class
+    ### comment ###
+    'use strict'
+    #{error}""",
+  """
+  class
+    ### comment 1 ###
+    ### comment 2 ###
+    'use strict'
+    #{error}""",
+  """
+  class
+    ### comment 1 ###
+    ### comment 2 ###
+    'use strict'
+    #{error}
+    ### comment 3 ###"""
+  ]
+  throws (-> CoffeeScript.run comment, bare: yes) for comment in comments
+
+  # [ES5 §14.1](http://es5.github.com/#x14.1) allows for other directives
+  directives = ["""
+  class
+    'directive 1'
+    'use strict'
+    #{error}""",
+  """
+  class
+    'use strict'
+    'directive 2'
+    #{error}""",
+  """
+  class
+    ### comment 1 ###
+    'directive 1'
+    'use strict'
+    #{error}""",
+  """
+  class
+    ### comment 1 ###
+    'directive 1'
+    ### comment 2 ###
+    'use strict'
+    #{error}"""
+  ]
+  throws (-> CoffeeScript.run directive, bare: yes) for directive in directives
+
+test "#2052: classes should work in strict mode", ->
+  try
+    do ->
+      'use strict'
+      class A
+  catch e
+    ok no

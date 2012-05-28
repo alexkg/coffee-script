@@ -4,6 +4,10 @@
 #
 #     coffee> console.log "#{num} bottles of beer" for num in [99..1]
 
+# Start by opening up `stdin` and `stdout`.
+stdin = process.openStdin()
+stdout = process.stdout
+
 # Require the **coffee-script** module to get access to the compiler.
 CoffeeScript = require './coffee-script'
 readline     = require 'readline'
@@ -15,36 +19,78 @@ Module       = require 'module'
 
 # Config
 REPL_PROMPT = 'coffee> '
+REPL_PROMPT_MULTILINE = '------> '
 REPL_PROMPT_CONTINUATION = '......> '
 enableColours = no
 unless process.platform is 'win32'
   enableColours = not process.env.NODE_DISABLE_COLORS
 
-# Start by opening up `stdin` and `stdout`.
-stdin = process.openStdin()
-stdout = process.stdout
-
 # Log an error.
 error = (err) ->
   stdout.write (err.stack or err.toString()) + '\n'
 
+## Autocompletion
+
+# Regexes to match complete-able bits of text.
+ACCESSOR  = /\s*([\w\.]+)(?:\.(\w*))$/
+SIMPLEVAR = /(\w+)$/i
+
+# Returns a list of completions, and the completed text.
+autocomplete = (text) ->
+  completeAttribute(text) or completeVariable(text) or [[], text]
+
+# Attempt to autocomplete a chained dotted attribute: `one.two.three`.
+completeAttribute = (text) ->
+  if match = text.match ACCESSOR
+    [all, obj, prefix] = match
+    try obj = Script.runInThisContext obj
+    catch e
+      return
+    return unless obj?
+    obj = Object obj
+    candidates = Object.getOwnPropertyNames obj
+    while obj = Object.getPrototypeOf obj
+      for key in Object.getOwnPropertyNames obj when key not in candidates
+        candidates.push key
+    completions = getCompletions prefix, candidates
+    [completions, prefix]
+
+# Attempt to autocomplete an in-scope free variable: `one`.
+completeVariable = (text) ->
+  free = text.match(SIMPLEVAR)?[1]
+  free = "" if text is ""
+  if free?
+    vars = Script.runInThisContext 'Object.getOwnPropertyNames(Object(this))'
+    keywords = (r for r in CoffeeScript.RESERVED when r[..1] isnt '__')
+    candidates = vars
+    for key in keywords when key not in candidates
+      candidates.push key
+    completions = getCompletions free, candidates
+    [completions, free]
+
+# Return elements of candidates for which `prefix` is a prefix.
+getCompletions = (prefix, candidates) ->
+  el for el in candidates when 0 is el.indexOf prefix
+
+# Make sure that uncaught exceptions don't kill the REPL.
+process.on 'uncaughtException', error
+
 # The current backlog of multi-line code.
 backlog = ''
-
-# The REPL context; must be visible outside `run` to allow for tab completion
-sandbox = Script.createContext()
-nonContextGlobals = [
-  'Buffer', 'console', 'process'
-  'setInterval', 'clearInterval'
-  'setTimeout', 'clearTimeout'
-]
-sandbox[g] = global[g] for g in nonContextGlobals
-sandbox.global = sandbox.root = sandbox.GLOBAL = sandbox
 
 # The main REPL function. **run** is called every time a line of code is entered.
 # Attempt to evaluate the command. If there's an exception, print it out instead
 # of exiting.
 run = (buffer) ->
+  # remove single-line comments
+  buffer = buffer.replace /(^|[\r\n]+)(\s*)##?(?:[^#\r\n][^\r\n]*|)($|[\r\n])/, "$1$2$3"
+  # remove trailing newlines
+  buffer = buffer.replace /[\r\n]+$/, ""
+  if multilineMode
+    backlog += "#{buffer}\n"
+    repl.setPrompt REPL_PROMPT_CONTINUATION
+    repl.prompt()
+    return
   if !buffer.toString().trim() and !backlog
     repl.prompt()
     return
@@ -57,77 +103,93 @@ run = (buffer) ->
   repl.setPrompt REPL_PROMPT
   backlog = ''
   try
-    _ = sandbox._
+    _ = global._
     returnValue = CoffeeScript.eval "_=(#{code}\n)", {
-      sandbox,
       filename: 'repl'
       modulename: 'repl'
     }
     if returnValue is undefined
-      sandbox._ = _
-    else
-      process.stdout.write inspect(returnValue, no, 2, enableColours) + '\n'
+      global._ = _
+    repl.output.write "#{inspect returnValue, no, 2, enableColours}\n"
   catch err
     error err
   repl.prompt()
 
-## Autocompletion
-
-# Regexes to match complete-able bits of text.
-ACCESSOR  = /\s*([\w\.]+)(?:\.(\w*))$/
-SIMPLEVAR = /\s*(\w*)$/i
-
-# Returns a list of completions, and the completed text.
-autocomplete = (text) ->
-  completeAttribute(text) or completeVariable(text) or [[], text]
-
-# Attempt to autocomplete a chained dotted attribute: `one.two.three`.
-completeAttribute = (text) ->
-  if match = text.match ACCESSOR
-    [all, obj, prefix] = match
-    try
-      val = Script.runInContext obj, sandbox
-    catch error
-      return
-    completions = getCompletions prefix, Object.getOwnPropertyNames val
-    [completions, prefix]
-
-# Attempt to autocomplete an in-scope free variable: `one`.
-completeVariable = (text) ->
-  free = (text.match SIMPLEVAR)?[1]
-  if free?
-    vars = Script.runInContext 'Object.getOwnPropertyNames(this)', sandbox
-    keywords = (r for r in CoffeeScript.RESERVED when r[0..1] isnt '__')
-    possibilities = vars.concat keywords
-    completions = getCompletions free, possibilities
-    [completions, free]
-
-# Return elements of candidates for which `prefix` is a prefix.
-getCompletions = (prefix, candidates) ->
-  (el for el in candidates when el.indexOf(prefix) is 0)
-
-# Make sure that uncaught exceptions don't kill the REPL.
-process.on 'uncaughtException', error
-
-# Create the REPL by listening to **stdin**.
-if readline.createInterface.length < 3
-  repl = readline.createInterface stdin, autocomplete
-  stdin.on 'data', (buffer) -> repl.write buffer
+if stdin.readable and stdin.isRaw
+  # handle piped input
+  pipedInput = ''
+  repl =
+    prompt: -> stdout.write @_prompt
+    setPrompt: (p) -> @_prompt = p
+    input: stdin
+    output: stdout
+    on: ->
+  stdin.on 'data', (chunk) ->
+    pipedInput += chunk
+    return unless /\n/.test pipedInput
+    lines = pipedInput.split "\n"
+    pipedInput = lines[lines.length - 1]
+    for line in lines[...-1] when line
+      stdout.write "#{line}\n"
+      run line
+    return
+  stdin.on 'end', ->
+    for line in pipedInput.trim().split "\n" when line
+      stdout.write "#{line}\n"
+      run line
+    stdout.write '\n'
+    process.exit 0
 else
-  repl = readline.createInterface stdin, stdout, autocomplete
+  # Create the REPL by listening to **stdin**.
+  if readline.createInterface.length < 3
+    repl = readline.createInterface stdin, autocomplete
+    stdin.on 'data', (buffer) -> repl.write buffer
+  else
+    repl = readline.createInterface stdin, stdout, autocomplete
+
+multilineMode = off
+
+# Handle multi-line mode switch
+repl.input.on 'keypress', (char, key) ->
+  # test for Ctrl-v
+  return unless key and key.ctrl and not key.meta and not key.shift and key.name is 'v'
+  cursorPos = repl.cursor
+  repl.output.cursorTo 0
+  repl.output.clearLine 1
+  multilineMode = not multilineMode
+  repl._line() if not multilineMode and backlog
+  backlog = ''
+  repl.setPrompt (newPrompt = if multilineMode then REPL_PROMPT_MULTILINE else REPL_PROMPT)
+  repl.prompt()
+  repl.output.cursorTo newPrompt.length + (repl.cursor = cursorPos)
+
+# Handle Ctrl-d press at end of last line in multiline mode
+repl.input.on 'keypress', (char, key) ->
+  return unless multilineMode and repl.line
+  # test for Ctrl-d
+  return unless key and key.ctrl and not key.meta and not key.shift and key.name is 'd'
+  multilineMode = off
+  repl._line()
 
 repl.on 'attemptClose', ->
-  if backlog
+  if multilineMode
+    multilineMode = off
+    repl.output.cursorTo 0
+    repl.output.clearLine 1
+    repl._onLine repl.line
+    return
+  if backlog or repl.line
     backlog = ''
-    process.stdout.write '\n'
+    repl.historyIndex = -1
     repl.setPrompt REPL_PROMPT
-    repl.prompt()
+    repl.output.write '\n(^C again to quit)'
+    repl._line (repl.line = '')
   else
     repl.close()
 
 repl.on 'close', ->
-  process.stdout.write '\n'
-  stdin.destroy()
+  repl.output.write '\n'
+  repl.input.destroy()
 
 repl.on 'line', run
 

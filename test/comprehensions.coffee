@@ -244,21 +244,13 @@ test "Optimized range comprehensions.", ->
 
   exxes = ('x' for [0...10])
   ok exxes.join(' ') is 'x x x x x x x x x x'
-
-
-test "Comprehensions safely redeclare parameters if they're not present in closest scope.", ->
-
-  rule = (x) -> x
-
-  learn = ->
-    rule for rule in [1, 2, 3]
-
-  ok learn().join(' ') is '1 2 3'
-
-  ok rule(101) is 101
-
-  f = -> [-> ok no, 'should cache source']
-  ok yes for k of [f] = f()
+  
+  
+test "Loop variables should be able to reference outer variables", ->
+  outer = 1
+  do ->
+    null for outer in [1, 2, 3]
+  eq outer, 3
 
 
 test "Lenient on pure statements not trying to reach out of the closure", ->
@@ -453,3 +445,60 @@ test "#1669: break/continue should skip the result only for that branch", ->
         continue unless n % 5
         n
   eq "#{ns}", "1,,3,,,7,,9"
+
+test "#1850: inner `for` should not be expression-ized if `return`ing", ->
+  eq '3,4,5', do ->
+    for a in [1..9] then \
+    for b in [1..9]
+      c = Math.sqrt a*a + b*b
+      return String [a, b, c] unless c % 1
+
+test "#1910: loop index should be mutable within a loop iteration and immutable between loop iterations", ->
+  n = 1
+  iterations = 0
+  arr = [0..n]
+  for v, k in arr
+    ++iterations
+    v = k = 5
+    eq 5, k
+  eq 2, k
+  eq 2, iterations
+
+  iterations = 0
+  for v in [0..n]
+    ++iterations
+  eq 2, k
+  eq 2, iterations
+
+  arr = ([v, v + 1] for v in [0..5])
+  iterations = 0
+  for own [v0, v1], k in arr when v0
+    k += 3
+    ++iterations
+  eq 6, k
+  eq 5, iterations
+
+test "#2007: Return object literal from comprehension", ->
+  y = for x in [1, 2]
+    foo: "foo" + x
+  eq 2, y.length
+  eq "foo1", y[0].foo
+  eq "foo2", y[1].foo
+
+  x = 2
+  y = while x
+    x: --x
+  eq 2, y.length
+  eq 1, y[0].x
+  eq 0, y[1].x
+  
+test "#2274: Allow @values as loop variables", ->
+  obj = {
+    item: null
+    method: ->
+      for @item in [1, 2, 3]
+        null
+  }
+  eq obj.item, null
+  obj.method()
+  eq obj.item, 3
