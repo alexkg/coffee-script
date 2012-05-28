@@ -167,7 +167,7 @@ class exports.Rewriter
       not token.generated and @tag(i - 1) isnt ',' and (tag in IMPLICIT_END or
         (tag is 'INDENT' and not seenControl)) and
         (tag isnt 'INDENT' or
-          (@tag(i - 2) not in ['CLASS', 'EXTENDS'] and @tag(i - 1) not in IMPLICIT_BLOCK and
+          (@tag(i - 2) not in ['CLASS', 'EXTENDS'] and @tag(i - 1) not in IMPLICIT_BLOCK and @tag(i - 2) not in EXPLICIT_CALL and
           not ((post = @tokens[i + 1]) and post.generated and post[0] is '{')))
 
     action = (token, i) ->
@@ -238,6 +238,7 @@ class exports.Rewriter
   # Tag postfix conditionals as such, so that we can parse them with a
   # different precedence.
   tagPostfixConditionals: ->
+    {tokens} = this
 
     original = null
 
@@ -245,7 +246,8 @@ class exports.Rewriter
       token[0] in ['TERMINATOR', 'INDENT']
 
     action = (token, i) =>
-      if token[0] isnt 'INDENT' or (token.generated and not token.fromThen) or (@tokens[i-1][0] in EXPLICIT_CALL)
+      prev = tokens[i - 1]
+      if token[0] isnt 'INDENT' or (token.generated and not token.fromThen) or (prev and prev[0] in EXPLICIT_CALL)
         original[0] = 'POST_' + original[0]
 
     @scanTokens (token, i) ->

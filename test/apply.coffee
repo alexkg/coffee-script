@@ -1,10 +1,5 @@
 compact = (out) ->
-  out = out.replace(/(\w)[\s]+(\W)/gm, "$1$2")
-  out = out.replace(/(\W)[\s]+(\W)/gm, "$1$2")
-  out = out.replace(/(\W)[\s]+(\w)/gm, "$1$2")
-  out = out.replace(/^\s+/g, "")
-  out = out.replace(/\s+$/g, "")
-  out = out.replace(/;/g, "")
+  out = out.replace /[\s;]/g, ''
 
 join = (xs...) -> xs.join ' '
 
@@ -87,12 +82,12 @@ test "compatible with post if", ->
   out = compact CoffeeScript.compile """
   return f <- 1,2 if b
   """, bare:on
-  eq out, "if(b)return f(1,2)"
+  eq out, "if(b){returnf(1,2)}"
   
   out = compact CoffeeScript.compile """
   return f <- if b then 1 else 2
   """, bare:on
-  eq out, "return f(b?1:2)"
+  eq out, "returnf(b?1:2)"
 
 test "receiver binding compatible with @", ->
   o =
