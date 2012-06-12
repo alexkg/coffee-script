@@ -406,6 +406,7 @@ exports.Value = class Value extends Base
     for node in @properties.concat @base
       return no if node.soak or node instanceof Call
     yes
+  isPlaceholder  : -> not @properties.length and @base instanceof Literal and @base.value is '_'
 
   isStatement : (o)    -> not @properties.length and @base.isStatement o
   assigns     : (name) -> not @properties.length and @base.assigns name
@@ -584,11 +585,30 @@ exports.Call = class Call extends Base
     if code = Splat.compileSplattedArray o, @args, true
       return @compileSplat o, code
     args = @filterImplicitObjects @args
-    args = (arg.compile o, LEVEL_LIST for arg in args).join ', '
-    if @isSuper
-      @superReference(o) + ".call(#{@superThis(o)}#{ args and ', ' + args })"
+    args = arg.compile o, LEVEL_LIST for arg in args
+    
+    curriedPositions = []
+    curriedArguments = []
+    for arg, i in args
+      unless arg instanceof Value and arg.isPlaceholder()
+        curriedPositions.push arg
+        curriedArguments.push i
+    
+    if curriedPositions.length is args.length
+      args = args.join ','
+      if @isSuper
+        @superReference(o) + ".call(#{@superThis(o)}#{ args and ', ' + args })"
+      else
+        (if @isNew then 'new ' else '') + @variable.compile(o, LEVEL_ACCESS) + "(#{args})"
+
     else
-      (if @isNew then 'new ' else '') + @variable.compile(o, LEVEL_ACCESS) + "(#{args})"
+      curriedPositions = curriedPositions.join ', '
+      curriedArguments = curriedArguments.join ', '
+      if @isSuper
+        "#{utility 'curry'}(@superReference(o), [#{curriedPositions}], [#{curriedArguments}])"
+      else
+        
+
 
   # `super()` is converted into a call against the superclass's implementation
   # of the current function.
@@ -1962,6 +1982,16 @@ UTILITIES =
   extends: -> """
     function(child, parent) { for (var key in parent) { if (#{utility 'hasProp'}.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; }
   """
+
+  curry: -> '''
+    function(fn, curriedPositions, curriedArguments) {
+      return function() {
+        for (var i = 0; i < curriedPositions.length; i ++)
+          Array.prototype.splice.call (arguments, curriedPositions[i], 0, curriedArguments[i]);
+        return fn.apply (this, arguments);
+      }  
+    }
+  '''
 
   # Create a function bound to the current value of "this".
   bind: -> '''
